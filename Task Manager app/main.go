@@ -21,13 +21,17 @@ func main() {
 		input := userInput.Text()
 
 		for strings.ToLower(input) != "exit" {
-			commands.ExecuteCommand(input)
+			err := commands.ExecuteCommand(input)
+
+			if err != nil {
+				fmt.Println("Error:", err)
+			}
 
 			userInput.Scan()
 			input = userInput.Text()
 		}
 
 	} else if userInput.Err().Error() != "" {
-		fmt.Println("Error while retrieving the command. Please try again")
+		fmt.Println("Error while retrieving the command. Please try again.")
 	}
 }

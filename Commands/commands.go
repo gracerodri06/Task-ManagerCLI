@@ -2,11 +2,12 @@ package commands
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -19,7 +20,7 @@ type Task struct {
 	UpdatedAt   string
 }
 
-func ExecuteCommand(command string) {
+func ExecuteCommand(command string) error {
 
 	var action string
 	var actionArgs string
@@ -35,62 +36,90 @@ func ExecuteCommand(command string) {
 		actionArgs = res[1]
 	}
 
-	taskList := filetoJson()
+	tasklist, err := filetoJson()
+
+	if err != nil {
+		return err
+	}
 
 	switch action {
 	case "add":
-		taskList = addTask(actionArgs, taskList)
+		var taskid string
+		tasklist, taskid, err = addTask(actionArgs, tasklist)
+
+		if err == nil {
+			fmt.Printf("Task added successfully (ID: %s) \n", taskid)
+		}
 
 	case "update":
-		taskList = updateTask(actionArgs, taskList)
+		tasklist, err = updateTask(actionArgs, tasklist)
+
+		if err == nil {
+			fmt.Println("Task updated successfully")
+		}
 
 	case "delete":
-		deleteTask(actionArgs, taskList)
+		tasklist, err = deleteTask(actionArgs, tasklist)
+
+		if err == nil {
+			fmt.Printf("Task ID %s deleted successfully \n", actionArgs)
+		}
 
 	case "mark-in-progress":
-		markInProgress(actionArgs, taskList)
+		tasklist, err = markInProgress(actionArgs, tasklist)
+
+		if err == nil {
+			fmt.Printf("Task ID %s marked as in-progress \n", actionArgs)
+		}
 
 	case "mark-done":
-		markDone(actionArgs, taskList)
+		tasklist, err = markDone(actionArgs, tasklist)
+
+		if err == nil {
+			fmt.Printf("Task ID %s marked as done \n", actionArgs)
+		}
 
 	case "list":
-		list(actionArgs, taskList)
+		err = list(actionArgs, tasklist)
 
 	default:
-		fmt.Println("Invalid command")
-		return
+		return errors.New("Invalid command")
 
 	}
 
-	filetoJson()
+	if err != nil {
+		return err
+	}
 
+	return JsontoFile(tasklist)
 }
 
-func addTask(args string, taskList []Task) []Task {
+func addTask(args string, tasklist []Task) (tasks []Task, taskid string, err error) {
 
-	addArgs := strings.SplitAfterN(args, " ", 2)
-
-	if len(addArgs) == 1 || len(addArgs) > 2 {
-		fmt.Println("Error: Invalid arguments for add command.")
-		return taskList
+	if len(args) == 0 {
+		return tasklist, "", errors.New("Invalid arguments for add command.")
 	}
+
+	lenTasks := len(tasklist)
+
+	taskID := lenTasks + 1
 
 	var newTask Task
-	newTask.Id = strings.TrimSpace(addArgs[0])
-	newTask.Description = addArgs[1]
-	newTask.Status = "To-do"
+	newTask.Id = strconv.Itoa(taskID)
+	newTask.Description = args
+	newTask.Status = "todo"
 	newTask.CreatedAt = time.Now().Format(time.RFC3339)
 	newTask.UpdatedAt = "0"
-	return append(taskList, newTask)
+	return append(tasklist, newTask), newTask.Id, nil
 
 }
 
-func updateTask(args string, tasklist []Task) []Task {
+func updateTask(args string, tasklist []Task) ([]Task, error) {
 
 	updArgs := strings.SplitAfterN(args, " ", 2)
 
 	if len(updArgs) != 2 {
-		fmt.Println("Error: Invalid arguments for update command.")
+		return tasklist, errors.New("Invalid arguments for update command.")
 	}
 
 	idx := -1
@@ -106,7 +135,7 @@ func updateTask(args string, tasklist []Task) []Task {
 	}
 
 	if idx == -1 {
-		fmt.Println("Error: Invalid ID. Task not found")
+		return tasklist, errors.New("Invalid ID. Task not found.")
 	}
 
 	//Change the status
@@ -115,35 +144,33 @@ func updateTask(args string, tasklist []Task) []Task {
 
 	tasklist = slices.Replace(tasklist, idx, idx+1, record)
 
-	for _, val := range tasklist {
-		fmt.Printf("%s: %s\n", val.Id, val.Description)
-	}
-
-	return tasklist
+	return tasklist, nil
 
 }
 
-func deleteTask(args string, tasklist []Task) []Task {
+func deleteTask(args string, tasklist []Task) ([]Task, error) {
 
 	if len(args) == 0 {
-		fmt.Println("Error: Invalid arguments for delete command.")
-		return tasklist
+		return tasklist, errors.New("Invalid arguments for delete command.")
 	}
 
-	//Pensar em alguma maneira de verificar que o delete rolou. Ou que o ID é inválido
+	initialLen := len(tasklist)
 
 	tasklist = slices.DeleteFunc(tasklist, func(task Task) bool {
 		return task.Id == args
 	})
 
-	for _, val := range tasklist {
-		fmt.Printf("%s: %s\n", val.Id, val.Status)
+	finalLen := len(tasklist)
+
+	if initialLen != finalLen {
+		return tasklist, nil
+	} else {
+		return tasklist, errors.New("Was not possible to delete this task. Please check the ID.")
 	}
 
-	return tasklist
 }
 
-func markInProgress(args string, tasklist []Task) []Task {
+func markInProgress(args string, tasklist []Task) ([]Task, error) {
 
 	idx := -1
 	var record Task
@@ -158,25 +185,20 @@ func markInProgress(args string, tasklist []Task) []Task {
 	}
 
 	if idx == -1 {
-		fmt.Println("Error: Invalid ID. Task not found")
-		return tasklist
+		return tasklist, errors.New("Invalid ID. Task not found.")
 	}
 
 	//Change the status
-	record.Status = "In Progress"
+	record.Status = "in-progress"
 	record.UpdatedAt = time.Now().Format(time.RFC3339)
 
 	tasklist = slices.Replace(tasklist, idx, idx+1, record)
 
-	for _, val := range tasklist {
-		fmt.Printf("%s: %s\n", val.Id, val.Status)
-	}
-
-	return tasklist
+	return tasklist, nil
 
 }
 
-func markDone(args string, tasklist []Task) []Task {
+func markDone(args string, tasklist []Task) ([]Task, error) {
 
 	idx := -1
 	var record Task
@@ -191,34 +213,28 @@ func markDone(args string, tasklist []Task) []Task {
 	}
 
 	if idx == -1 {
-		fmt.Println("Error: Invalid ID. Task not found")
-		return tasklist
+		return tasklist, errors.New("Invalid ID. Task not found.")
 	}
 
 	//Change the status
-	record.Status = "Done"
+	record.Status = "done"
 	record.UpdatedAt = time.Now().Format(time.RFC3339)
 
 	tasklist = slices.Replace(tasklist, idx, idx+1, record)
 
-	for _, val := range tasklist {
-		fmt.Printf("%s: %s\n", val.Id, val.Status)
-	}
-
-	return tasklist
+	return tasklist, nil
 
 }
 
-func list(args string, tasklist []Task) []Task {
+func list(args string, tasklist []Task) error {
 
-	if args != " " && args != "in-progress" && args != "done" && args != "to-do" {
-		fmt.Println("Error: Invalid arguments for list command.")
-		return tasklist
+	if args != "" && args != "in-progress" && args != "done" && args != "todo" {
+		return errors.New("Invalid arguments for list command.")
 	}
 
 	if len(tasklist) == 0 {
 		fmt.Println("No tasks defined.")
-		return tasklist
+		return nil
 	}
 
 	for _, val := range tasklist {
@@ -228,11 +244,11 @@ func list(args string, tasklist []Task) []Task {
 		}
 	}
 
-	return tasklist
+	return nil
 
 }
 
-func filetoJson() []Task {
+func filetoJson() ([]Task, error) {
 
 	//Open the Json file
 	file, err := os.Open("Task Tracker.json")
@@ -241,7 +257,11 @@ func filetoJson() []Task {
 		file, err = os.Create("Task Tracker.json")
 
 		if err != nil {
-			//error handling
+			return nil, fmt.Errorf("Error on file creation: %w", err)
+
+		} else {
+			//New file - return an empty slice
+			return make([]Task, 0), nil
 		}
 	}
 
@@ -253,8 +273,7 @@ func filetoJson() []Task {
 
 	_, err = dec.Token()
 	if err != nil {
-		//fmt.Printf("%T: %v\n", t, t)
-		log.Fatal(err)
+		return nil, fmt.Errorf("Error while reading the file: : %w", err)
 	}
 
 	tasks := make([]Task, 0)
@@ -264,8 +283,7 @@ func filetoJson() []Task {
 		if err := dec.Decode(&data); err == io.EOF {
 			break
 		} else if err != nil {
-			fmt.Printf("%s", err)
-			break
+			return nil, fmt.Errorf("Error while reading the file: %w", err)
 		}
 
 		tasks = append(tasks, data)
@@ -273,17 +291,23 @@ func filetoJson() []Task {
 
 	_, err = dec.Token()
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("Error while reading the file: %w", err)
 	}
 
-	return tasks
+	return tasks, nil
 
 }
 
-func JsontoFile(tasks []Task) {
+func JsontoFile(tasks []Task) error {
 
-	b, _ := json.MarshalIndent(tasks, "", "")
+	b, err := json.MarshalIndent(tasks, "", "")
+
+	if err != nil {
+		return fmt.Errorf("Error on file creation/opening: %w", err)
+	}
 
 	os.WriteFile("Task Tracker.json", b, 0644)
+
+	return nil
 
 }
