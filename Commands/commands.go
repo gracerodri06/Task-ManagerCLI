@@ -20,7 +20,7 @@ type Task struct {
 	UpdatedAt   string
 }
 
-func ExecuteCommand(command string) error {
+func ExecuteCommand(command string, tasklist []Task) (tasks []Task, err error) {
 
 	var action string
 	var actionArgs string
@@ -34,12 +34,6 @@ func ExecuteCommand(command string) error {
 	case 2:
 		action = strings.TrimSpace(res[0])
 		actionArgs = res[1]
-	}
-
-	tasklist, err := filetoJson()
-
-	if err != nil {
-		return err
 	}
 
 	switch action {
@@ -83,15 +77,10 @@ func ExecuteCommand(command string) error {
 		err = list(actionArgs, tasklist)
 
 	default:
-		return errors.New("Invalid command")
-
+		err = errors.New("Invalid command")
 	}
 
-	if err != nil {
-		return err
-	}
-
-	return JsontoFile(tasklist)
+	return tasklist, err
 }
 
 func addTask(args string, tasklist []Task) (tasks []Task, taskid string, err error) {
@@ -100,9 +89,9 @@ func addTask(args string, tasklist []Task) (tasks []Task, taskid string, err err
 		return tasklist, "", errors.New("Invalid arguments for add command.")
 	}
 
-	lenTasks := len(tasklist)
-
-	taskID := lenTasks + 1
+	lastTask := tasklist[len(tasklist)-1]
+	taskID, _ := strconv.Atoi(lastTask.Id)
+	taskID = taskID + 1
 
 	var newTask Task
 	newTask.Id = strconv.Itoa(taskID)
@@ -248,7 +237,7 @@ func list(args string, tasklist []Task) error {
 
 }
 
-func filetoJson() ([]Task, error) {
+func FiletoJson() ([]Task, error) {
 
 	//Open the Json file
 	file, err := os.Open("Task Tracker.json")

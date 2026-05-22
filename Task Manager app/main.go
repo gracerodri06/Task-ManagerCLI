@@ -16,12 +16,26 @@ func main() {
 
 	userInput := bufio.NewScanner(os.Stdin)
 
+	var tasklist []commands.Task
+
 	if userInput.Scan() {
 
 		input := userInput.Text()
 
+		if strings.ToLower(input) != "exit" {
+			var err error
+			tasklist, err = commands.FiletoJson()
+
+			if err != nil {
+				fmt.Println("Error:", err)
+				return
+			}
+
+		}
+
 		for strings.ToLower(input) != "exit" {
-			err := commands.ExecuteCommand(input)
+			var err error
+			tasklist, err = commands.ExecuteCommand(input, tasklist)
 
 			if err != nil {
 				fmt.Println("Error:", err)
@@ -29,6 +43,15 @@ func main() {
 
 			userInput.Scan()
 			input = userInput.Text()
+
+			if strings.ToLower(input) == "exit" {
+				err := commands.JsontoFile(tasklist)
+				if err != nil {
+					fmt.Println("Error:", err)
+					return
+				}
+			}
+
 		}
 
 	} else if userInput.Err().Error() != "" {
