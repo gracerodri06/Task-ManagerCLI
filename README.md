@@ -9,16 +9,18 @@ Each task has the following fields:
 - ID - unique identifier for the task
 - Description
 - Status:
+
       To-do = task was not initialized
       In-Progress = task are being executed
       Done = task were finalized
+
 - Date/time of task creation
 - Date/time when a task was updated
 
 
-How it works?
+How does it work?
 
-After starting the app, it will be waiting for you command. Each command has its format. 
+After starting the app, it will be waiting for you command. Each command has its own format. 
 
 This is the command list:
 
@@ -72,3 +74,5 @@ This is the command list:
          Displays all the tasks on the list with status "done".
 
    Example: list in-progress
+
+When you complete all your updates, write "exit" to finish the program. Your changes will be saved on the task list file.
